@@ -868,6 +868,65 @@ def contact_us():
         return jsonify({'message': 'Contact form submitted successfully'}), 200
     except Exception as e:
         return jsonify({'message': f'Failed to send contact form: {str(e)}'}), 500
+import os
+import requests
+from flask import request, jsonify
+
+@app.route('/pay', methods=['POST'])
+def run_nestlink_prompt():
+    """
+    Send an M-Pesa STK Push payment prompt to a customer's phone using NestLink API.
+    """
+
+    # Load API key securely from environment variable
+    NESTLINK_API_KEY = os.getenv("NESTLINK_API_SECRET", "e700f2650280d67485d54475")
+    NESTLINK_URL = "https://api.nestlink.co.ke/runPrompt"
+
+    # Parse incoming JSON
+    data = request.get_json()
+    phone = data.get("phone")
+    amount = data.get("amount")
+    local_id = data.get("local_id", "")
+    transaction_desc = data.get("transaction_desc", "Payment via NestLink")
+
+    # Basic validation
+    if not phone or not amount:
+        return jsonify({
+            "error": "Missing required parameters: phone and amount"
+        }), 400
+
+    # Prepare payload for NestLink
+    payload = {
+        "phone": phone,
+        "amount": amount,
+        "local_id": local_id,
+        "transaction_desc": transaction_desc
+    }
+
+    # Prepare headers
+    headers = {
+        "Content-Type": "application/json",
+        "Api-Secret": NESTLINK_API_KEY
+    }
+
+    try:
+        # Make POST request to NestLink API
+        response = requests.post(NESTLINK_URL, headers=headers, json=payload, timeout=20)
+        response.raise_for_status()
+
+        # Parse and return JSON response from NestLink
+        nestlink_response = response.json()
+        return jsonify({
+            "message": "Payment prompt sent successfully",
+            "nestlink_response": nestlink_response
+        }), 200
+
+    except requests.exceptions.RequestException as e:
+        # Handle network or API errors
+        return jsonify({
+            "error": "Failed to connect to NestLink API",
+            "details": str(e)
+        }), 502
 
 if __name__ == '__main__':
     app.run(debug=True)
